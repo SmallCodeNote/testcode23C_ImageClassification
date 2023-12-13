@@ -19,7 +19,6 @@ namespace ImageClassificationTest
 {
     public partial class Form1 : Form
     {
-        IModelZoo model;
         string thisExeDirPath;
 
         public Form1()
@@ -27,6 +26,7 @@ namespace ImageClassificationTest
             InitializeComponent();
             thisExeDirPath = Path.GetDirectoryName(Application.ExecutablePath);
         }
+
         private void Form1_Load(object sender, EventArgs e)
         {
             string paramFilename = Path.Combine(thisExeDirPath, "_param.txt");
@@ -35,6 +35,7 @@ namespace ImageClassificationTest
                 WinFormStringCnv.setControlFromString(this, File.ReadAllText(paramFilename));
             }
         }
+
         private void Form1_FormClosing(object sender, FormClosingEventArgs e)
         {
             string FormContents = WinFormStringCnv.ToString(this);
@@ -42,64 +43,81 @@ namespace ImageClassificationTest
             File.WriteAllText(paramFilename, FormContents);
         }
 
-        private (FolderClassificationConfig config, int img_size) GetConfig()
+        private FolderClassificationConfig createConfig(string BaseFolderPath, int img_width, int img_height)
         {
             var config = new FolderClassificationConfig();
-            config.BaseFolder = @"R:\";
-            config.DataDir = "data";
-            var img_size = 256;
-
-            config.InputShape = (img_size, img_size);
-            config.BatchSize = 2;
-
-            return (config, img_size);
-        }
-
-
-        private void LoadModel()
-        {
-            if (comboBox_backboneName.Text == "AlexNet") model = new AlexNet();
-            else if (comboBox_backboneName.Text == "DenseNet") model = new DenseNet();
-            else if (comboBox_backboneName.Text == "GoogLeNet") model = new GoogLeNet();
-            else if (comboBox_backboneName.Text == "MobilenetV2") model = new MobilenetV2();
-            else if (comboBox_backboneName.Text == "NiN") model = new NiN();
-            else if (comboBox_backboneName.Text == "ResNet") model = new ResNet();
-            else if (comboBox_backboneName.Text == "VGG") model = new VGG();
-
-        }
-
-        private void button1_Click(object sender, EventArgs e)
-        {
-            var (config, img_size) = GetConfig();
-
-            config.BatchSize = 24;
+            config.BaseFolder = BaseFolderPath;
+            config.DataDir = "";
+            config.InputShape = (img_width, img_height);
+            config.BatchSize = 8;
             config.ValidationStep = 5;
             config.Epoch = 20;
 
-            LoadModel();
+            return config;
+        }
+
+
+        private IModelZoo createModel(string modelName)
+        {
+            IModelZoo model = null;
+
+            if (modelName == "AlexNet") model = new AlexNet();
+            else if (modelName == "DenseNet") model = new DenseNet();
+            else if (modelName == "GoogLeNet") model = new GoogLeNet();
+            else if (modelName == "MobilenetV2") model = new MobilenetV2();
+            else if (modelName == "NiN") model = new NiN();
+            else if (modelName == "ResNet") model = new ResNet();
+            else if (modelName == "VGG") model = new VGG();
+
+            return model;
+
+        }
+
+        private void button_TrainRun_Click(object sender, EventArgs e)
+        {
+
+            int[] imageSizeArray = Array.ConvertAll(textBox_imageSize.Text.Split(','), s => int.Parse(s));
+            int img_width = imageSizeArray[0];
+            int img_height = imageSizeArray[1];
+
+            var config = createConfig(textBox_BaseFolderPath.Text, img_width, img_height);
+            IModelZoo model = createModel(comboBox_backboneName.Text);
+
+            config.WeightsPath = $"{model.GetType().Name}_{img_width}x{img_height}_weights.ckpt";
 
             var classifier = new FolderClassification(config, model);
-
-            config.WeightsPath = $"{model.GetType().Name}_{img_size}x{img_size}_weights.ckpt";
 
             classifier.Train();
+
         }
 
-        private void button2_Click(object sender, EventArgs e)
+        private void button_RunClassification_Click(object sender, EventArgs e)
         {
-            var (config, img_size) = GetConfig();
+            int[] imageSizeArray = Array.ConvertAll(textBox_imageSize.Text.Split(','), s => int.Parse(s));
+            int img_width = imageSizeArray[0];
+            int img_height = imageSizeArray[1];
 
-            LoadModel();
+            var config = createConfig(textBox_BaseFolderPath.Text, img_width, img_height);
+            IModelZoo model = createModel(comboBox_backboneName.Text);
 
             var classifier = new FolderClassification(config, model);
 
-            config.WeightsPath = $"{model.GetType().Name}_{img_size}x{img_size}_weights.ckpt";
+            config.WeightsPath = $"{model.GetType().Name}_{img_width}x{img_height}_weights.ckpt";
 
-            var imageFile = Path.Combine(config.BaseFolder, "data", "class_a", "000000.png");
-            var result = classifier.Predict(imageFile);
-            label1.Text = ($"{result.Label}({result.Probability})");
+            OpenFileDialog ofd = new OpenFileDialog();
+            ofd.Multiselect = true;
+            if (ofd.ShowDialog() != DialogResult.OK) return;
+
+            List<string> resultLine = new List<string>();
+
+            foreach (string imageFilename in ofd.FileNames)
+            {
+                var result = classifier.Predict(imageFilename);
+                resultLine.Add(result.Label.ToString() + " " + result.Probability.ToString());
+            }
+
+            textBox_classificationResult.Text = string.Join("\r\n", resultLine.ToArray());
+
         }
-
-
     }
 }
