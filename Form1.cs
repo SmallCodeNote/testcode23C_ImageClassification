@@ -68,19 +68,25 @@ namespace ImageClassificationTest
             else if (modelName == "NiN") model = new NiN();
             else if (modelName == "ResNet") model = new ResNet();
             else if (modelName == "VGG") model = new VGG();
-
+            
             return model;
 
         }
 
         private void button_TrainRun_Click(object sender, EventArgs e)
         {
-
             int[] imageSizeArray = Array.ConvertAll(textBox_imageSize.Text.Split(','), s => int.Parse(s));
             int img_width = imageSizeArray[0];
             int img_height = imageSizeArray[1];
 
             var config = createConfig(textBox_BaseFolderPath.Text, img_width, img_height);
+
+            int Epoch = int.Parse(textBox_Epoch.Text);
+            int BatchSize = int.Parse(textBox_BatchSize.Text);
+
+            config.Epoch = Epoch;
+            config.BatchSize = BatchSize;
+
             IModelZoo model = createModel(comboBox_backboneName.Text);
 
             config.WeightsPath = $"{model.GetType().Name}_{img_width}x{img_height}_weights.ckpt";
@@ -90,6 +96,7 @@ namespace ImageClassificationTest
             classifier.Train();
 
         }
+
 
         private void button_RunClassification_Click(object sender, EventArgs e)
         {
@@ -119,5 +126,37 @@ namespace ImageClassificationTest
             textBox_classificationResult.Text = string.Join("\r\n", resultLine.ToArray());
 
         }
+
+        private void textBox_BatchSize_TextChanged(object sender, EventArgs e)
+        {
+
+        }
+
+        private void label_BaseFolderPath_Click(object sender, EventArgs e)
+        {
+            System.Diagnostics.Process.Start(textBox_BaseFolderPath.Text);
+
+        }
+
+        private void button_makeModel_Click(object sender, EventArgs e)
+        {
+            int[] imageSizeArray = Array.ConvertAll(textBox_imageSize.Text.Split(','), s => int.Parse(s));
+            int img_width = imageSizeArray[0];
+            int img_height = imageSizeArray[1];
+
+            var config = createConfig(textBox_BaseFolderPath.Text, img_width, img_height);
+
+            int Epoch = int.Parse(textBox_Epoch.Text);
+            int BatchSize = int.Parse(textBox_BatchSize.Text);
+
+            config.Epoch = Epoch;
+            config.BatchSize = BatchSize;
+
+            IModelZoo model = createModel(comboBox_backboneName.Text);
+
+            var classifier = new FolderClassification(config, model);
+
+        }
     }
+
 }
