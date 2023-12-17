@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
@@ -12,9 +12,14 @@ namespace SciSharp.Models.ImageClassification.Zoo
 {
     public class AlexNet : IModelZoo
     {
-        public IModel BuildModel(FolderClassificationConfig config)
+        public void Clear_session()
         {
             keras.backend.clear_session();
+        }
+
+        public IModel BuildModel(FolderClassificationConfig config)
+        {
+            Clear_session();
 
             var model = keras.Sequential(new List<ILayer> {
 
@@ -39,6 +44,7 @@ namespace SciSharp.Models.ImageClassification.Zoo
             });
 
             model.summary();
+            
 
             var X = tf.random.normal((1, config.InputShape[0], config.InputShape[1], 3));
             model.Apply(X); 
@@ -47,7 +53,7 @@ namespace SciSharp.Models.ImageClassification.Zoo
             //var optimizer = keras.optimizers.Adam();
             var loss = keras.losses.SparseCategoricalCrossentropy();
             model.compile(optimizer, loss, new[] { "accuracy" });
-            
+
             return model;
         }
     }
