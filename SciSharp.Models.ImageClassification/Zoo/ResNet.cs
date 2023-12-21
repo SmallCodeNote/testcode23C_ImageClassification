@@ -14,7 +14,7 @@ namespace SciSharp.Models.ImageClassification.Zoo
 
         public Tensor Residual(Tensor input, int in_ch, int out_ch, int strides = 1)
         {
-            Tensor x = input;
+
             /* Ref: https://qiita.com/anieca/items/9dfe3ef46e7b655bf3ee
             def functional_bottleneck_residual(x, in_ch, out_ch, strides=1):
     params = {
@@ -34,12 +34,12 @@ namespace SciSharp.Models.ImageClassification.Zoo
 
             int inter_ch = out_ch / 4;
 
-            Tensor h1 = keras.layers.Conv2D(inter_ch, kernel_size: 1, strides: strides, padding: "same", kernel_initializer: "he_normal", use_bias: true).Apply(x);
+            Tensor h1 = keras.layers.Conv2D(inter_ch, kernel_size: 1, strides: strides, padding: "same", kernel_initializer: "he_normal", use_bias: true).Apply(input);
             h1 = keras.layers.BatchNormalization().Apply(h1);
-            h1 = keras.layers.LeakyReLU().Apply(h1);
+            h1 = keras.layers.LeakyReLU(alpha: 0).Apply(h1);
             h1 = keras.layers.Conv2D(inter_ch, kernel_size: 3, strides: 1, padding: "same", kernel_initializer: "he_normal", use_bias: true).Apply(h1);
             h1 = keras.layers.BatchNormalization().Apply(h1);
-            h1 = keras.layers.LeakyReLU().Apply(h1);
+            h1 = keras.layers.LeakyReLU(alpha: 0).Apply(h1);
             h1 = keras.layers.Conv2D(out_ch, kernel_size: 1, strides: 1, padding: "same", kernel_initializer: "he_normal", use_bias: true).Apply(h1);
             h1 = keras.layers.BatchNormalization().Apply(h1);
 
@@ -53,13 +53,13 @@ namespace SciSharp.Models.ImageClassification.Zoo
             Tensor h2;
             if (in_ch != out_ch)
             {
-                h2 = keras.layers.Conv2D(out_ch, kernel_size: 1, strides: strides, padding: "same", kernel_initializer: "he_normal", use_bias: true).Apply(x);
+                h2 = keras.layers.Conv2D(out_ch, kernel_size: 1, strides: strides, padding: "same", kernel_initializer: "he_normal", use_bias: true).Apply(input);
                 h2 = keras.layers.BatchNormalization().Apply(h2);
 
             }
             else
             {
-                h2 = x;
+                h2 = input;
 
             }
 
@@ -68,8 +68,8 @@ namespace SciSharp.Models.ImageClassification.Zoo
                 return h*/
 
             Tensor h = keras.layers.Add().Apply(new[] { h1, h2 });
-            h = keras.layers.LeakyReLU().Apply(h);
-
+            h = keras.layers.LeakyReLU(alpha:0).Apply(h);
+            
             return h;
         }
 
