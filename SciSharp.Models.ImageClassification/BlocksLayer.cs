@@ -17,7 +17,12 @@ namespace SciSharp.Models.ImageClassification
     /// </summary>
     public class BlocksLayer : Layer
     {
-        public static int layerId;
+        static int layerId=0;
+
+        public void Clear_session()
+        {
+            layerId = 0;
+        }
 
         public BlocksLayer(LayerArgs args) : base(args)
         {

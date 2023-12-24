@@ -173,7 +173,7 @@ namespace SciSharp.Models.ImageClassification.Zoo
 
             model.summary();
 
-            var X = tf.random.normal((1, config.InputShape[0], config.InputShape[1], 3));
+            var X = tf.random.normal((1, config.InputShape[0], config.InputShape[1], config.Channel));
             model.Apply(X);
 
             //var optimizer = keras.optimizers.SGD();

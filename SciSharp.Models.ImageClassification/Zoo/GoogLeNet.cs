@@ -85,12 +85,16 @@ namespace SciSharp.Models.ImageClassification.Zoo
 
 
         }
-
-        public  IModel BuildModel(FolderClassificationConfig config)
+        public void Clear_session()
         {
             keras.backend.clear_session();
             Inception.layerId = 0;
-            BlocksLayer.layerId = 0;
+            //BlocksLayer.layerId = 0;
+        }
+
+        public IModel BuildModel(FolderClassificationConfig config)
+        {
+            Clear_session();
 
             Func<BlocksLayer> b1 = () =>
             {
