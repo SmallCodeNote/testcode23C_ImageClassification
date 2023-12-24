@@ -5,9 +5,14 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+
+using System.Windows.Forms;
+
 using Tensorflow;
 using Tensorflow.Keras;
 using Tensorflow.Keras.Engine;
+using Tensorflow.Keras.Utils;
+
 using static Tensorflow.Binding;
 using static Tensorflow.KerasApi;
 using Tensorflow.NumPy;
@@ -22,12 +27,19 @@ using System.Data;
 namespace SciSharp.Models.ImageClassification
 {
 
-    public class FolderClassificationConfig: TaskOptions
+    public class FolderClassificationConfig : TaskOptions
     {
-        public FolderClassificationConfig() 
+
+        public Label label_AccuracyValue;
+        public Label label_LossValue;
+        public Label label_EpochCount;
+
+        public int EpochCount = 0;
+
+        public FolderClassificationConfig()
         {
             BaseFolder = "";
-            DataDir = "images";
+            DataDir = "";
             WeightsPath = "model.ckpt";
         }
 
@@ -72,22 +84,23 @@ namespace SciSharp.Models.ImageClassification
         /// default 10.
         /// </summary>
         public int ValidationStep { get; set; } = 10;
+
+        public int Channel { get; set; } = 3;
     }
 
 
 
     public class FolderClassification : IImageClassificationTask
     {
-        public FolderClassification(FolderClassificationConfig config, IModelZoo model )
+        IModelZoo Model;
+        FolderClassificationConfig _config;
+
+        public FolderClassification(FolderClassificationConfig config, IModelZoo model)
         {
+            _config = new FolderClassificationConfig();
             this.SetModelArgs(config);
             Model = model;
         }
-
-        IModelZoo Model;
-
-
-        FolderClassificationConfig _config = new FolderClassificationConfig();
 
         public string[] ClassNames
         {
@@ -138,7 +151,7 @@ namespace SciSharp.Models.ImageClassification
 
         public ModelPredictResult[] Predict(string[] fileNames)
         {
-            
+
             if (_config.ClassNames == null)
             {
                 // code form function keras.preprocessing.dataset_utils.index_directory()
@@ -147,13 +160,13 @@ namespace SciSharp.Models.ImageClassification
                 var class_dirs = Directory.GetDirectories(directory);
                 _config.ClassNames = class_dirs.Select(x => x.Split(Path.DirectorySeparatorChar).Last()).ToArray();
             }
-            
-            var dataset = keras.preprocessing.paths_to_dataset(fileNames, _config.InputShape, 3, _config.ClassNames.Length, "bilinear");
+
+            var dataset = keras.preprocessing.paths_to_dataset(fileNames, _config.InputShape, _config.Channel, _config.ClassNames.Length, "bilinear");
             dataset = dataset.batch(_config.BatchSize);
 
             var model = GetPredictModel();
-
-            var ret = model.predict(dataset, batch_size:_config.BatchSize);
+            model.summary();
+            var ret = model.predict(dataset, batch_size: _config.BatchSize);
             print(ret.shape);
 
             var results = new List<ModelPredictResult>(fileNames.Length);
@@ -168,20 +181,21 @@ namespace SciSharp.Models.ImageClassification
             {
                 var arr = prob[i];
 
-                string valueinfo = Path.GetFileName(Path.GetDirectoryName(fileNames[i]))+" | " ;
+                string valueinfo = Path.GetFileName(Path.GetDirectoryName(fileNames[i])) + " ||| ";
 
                 for (int id = 0; id < _config.ClassNames.Length; id++)
                 {
                     if (id > 0) valueinfo += " / ";
-                    valueinfo +=_config.ClassNames[id].ToString() + "(" + ((float)arr[id] * 100).ToString("0") + ")";
+                    valueinfo += _config.ClassNames[id].ToString() + "(" + ((float)arr[id] * 100).ToString("0") + ")";
                 }
 
                 var labelId = (int)np.argmax(arr);
 
-                results.add(new ModelPredictResult { 
-                    Label = valueinfo +" : "+ _config.ClassNames[(int)labelId],
+                results.add(new ModelPredictResult
+                {
+                    Label = valueinfo + " ||| " + _config.ClassNames[(int)labelId],
                     Probability = (float)arr[labelId] * 100,
-                    
+
                 });
             }
 
@@ -192,7 +206,7 @@ namespace SciSharp.Models.ImageClassification
 
         private IModel GetPredictModel()
         {
-            if(_predictModel == null)
+            if (_predictModel == null)
             {
                 var weightFileName = Path.Combine(_config.BaseFolder, _config.WeightsPath);
                 if (!File.Exists(weightFileName))
@@ -231,7 +245,7 @@ namespace SciSharp.Models.ImageClassification
         {
             var imgFolder = Path.Combine(_config.BaseFolder, _config.DataDir);
             //print($"load image filder: {imgFolder}");
-            var validation_split = _config.ValidationPercentage < 0.0f ? 0.3f:_config.ValidationPercentage;
+            var validation_split = _config.ValidationPercentage < 0.0f ? 0.3f : _config.ValidationPercentage;
 
             var training = keras.preprocessing.image_dataset_from_directory(
                 imgFolder,
@@ -302,29 +316,31 @@ namespace SciSharp.Models.ImageClassification
             return (training, validation);
         }
 
-        
+
         public (IDatasetV2 trainData, IDatasetV2 validationData) PreLoadTrainData()
         {
             return LoadTrainData(this._config);
         }
 
-        public void Train()
+        public string Train()
         {
-            Train(null);
+            return Train(null);
         }
 
-        public void Train(TrainingOptions options)
+        public string Train(TrainingOptions options)
         {
-            if(trainData == null)
+            if (trainData == null)
             {
-                (this.trainData, this.validationData) =  PreLoadTrainData();
+                (this.trainData, this.validationData) = PreLoadTrainData();
             }
 
             // tf.debugging.set_log_device_placement(true);
             tf.Context.Config.GpuOptions.AllowGrowth = true;
 
             var model = Model.BuildModel(_config);
-            model.summary();
+            string modelSummary = layer_utils_byString.get_summary((Tensorflow.Keras.Engine.Model)model);
+
+            var layers = model.Layers;
 
             var weightFileName = Path.Combine(_config.BaseFolder, _config.WeightsPath);
 
@@ -336,18 +352,22 @@ namespace SciSharp.Models.ImageClassification
 
             var callbacks = new List<ICallback>();
             callbacks.add(new FFCallback(model, _config));
-            
+
             model.fit(
                 trainData,
                 validation_data: validationData,
                 validation_step: _config.ValidationStep,
-                epochs: _config.Epoch, 
+                epochs: _config.Epoch,
                 batch_size: _config.BatchSize,
-                callbacks: callbacks, 
-                workers: 1, 
-                use_multiprocessing: false );
+                callbacks: callbacks,
+                workers: 1,
+                use_multiprocessing: false);
 
             model.save_weights(weightFileName);
+
+
+            return modelSummary;
+
         }
     }
 
@@ -355,6 +375,24 @@ namespace SciSharp.Models.ImageClassification
     {
         IModel model;
         FolderClassificationConfig config;
+
+        public void updateLabel(Label label, string text)
+        {
+
+            if (label.InvokeRequired)
+            {
+                label.Invoke((MethodInvoker)delegate { label.Text = text; });
+            }
+            else
+            {
+                label.Text = text;
+
+            };
+
+
+
+        }
+
 
         public FFCallback(IModel model, FolderClassificationConfig config)
         {
@@ -413,11 +451,14 @@ namespace SciSharp.Models.ImageClassification
 
         void ICallback.on_train_batch_begin(long step)
         {
+            if (step == 0) { config.EpochCount++; }
         }
 
         void ICallback.on_train_batch_end(long end_step, Dictionary<string, float> logs)
         {
-
+            updateLabel(config.label_AccuracyValue, ((int)(logs["accuracy"]*100)).ToString());
+            updateLabel(config.label_EpochCount, (config.EpochCount.ToString()));
+            updateLabel(config.label_LossValue, logs["loss"].ToString());
         }
 
         void ICallback.on_train_begin()
